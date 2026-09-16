@@ -3,143 +3,173 @@ import pandas as pd
 import hashlib
 import json
 import os
+import plotly.express as px
 
 # --- CONFIGURACIÓN DE MEMORIA FÍSICA ---
-ARCHIVO_MEMORIA = "memoria_sandbox_segura.json" # Cambiamos el nombre para empezar con la nueva seguridad
-
-# --- NUEVO: LA "SAL" CRIPTOGRÁFICA (SALTING) ---
-# Esta es la palabra secreta. En un banco real esto se guarda bajo llave, no en el código.
+ARCHIVO_MEMORIA = "memoria_sandbox_segura.json"
 SAL_SECRETA = "Tr#9q!Lp$2*mZ&8vX@1y_Sandbox_Riesgo_2026_UltraSecreto"
 
 def cargar_memoria():
-    """Lee los datos guardados en el archivo físico."""
     if os.path.exists(ARCHIVO_MEMORIA):
         with open(ARCHIVO_MEMORIA, "r") as f:
             return json.load(f)
     return {}
 
 def guardar_memoria(datos):
-    """Guarda los datos en el archivo físico."""
     with open(ARCHIVO_MEMORIA, "w") as f:
         json.dump(datos, f)
 
-# 1. CONFIGURACIÓN DE LA PÁGINA
-st.set_page_config(page_title="Sandbox de Riesgo", page_icon="🛡️", layout="centered")
+# 1. CONFIGURACIÓN DE LA PÁGINA (Ahora usamos layout="wide" para usar toda la pantalla)
+st.set_page_config(page_title="Motor de Riesgo Anti-Fraude", page_icon="🛡️", layout="wide")
+
+# --- ESTILOS CSS PERSONALIZADOS ---
+st.markdown("""
+    <style>
+        .main-header { font-size: 2.5rem; color: #1E3A8A; font-weight: 700; margin-bottom: 0px;}
+        .sub-header { font-size: 1.2rem; color: #64748B; margin-bottom: 2rem;}
+        .stTabs [data-baseweb="tab-list"] { gap: 24px; }
+        .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; }
+    </style>
+""", unsafe_allow_html=True)
 
 # 2. CARGA DE BASE DE DATOS
 if 'database' not in st.session_state:
     st.session_state['database'] = cargar_memoria()
 
-# 3. FUNCIÓN PARA TOKENIZAR (Ahora con SALTING)
 def tokenizar_dato(valor):
     if pd.isna(valor) or valor == "": 
         return ""
-    valor_limpio = str(valor).strip().lower()
-    
-    # Aquí ocurre la magia: unimos el dato real con nuestra SAL secreta
-    dato_salado = valor_limpio + SAL_SECRETA
-    
-    # Aplicamos el SHA-256 al dato ya mezclado
+    dato_salado = str(valor).strip().lower() + SAL_SECRETA
     return hashlib.sha256(dato_salado.encode()).hexdigest()
 
-# 4. INTERFAZ GRÁFICA
-st.title("🛡️ Sandbox: Privacidad y Score de Riesgo")
-st.markdown("Prototipo académico con **Salting Criptográfico (SHA-256)** para prevención de fraude y tokenización de datos confidenciales.")
+# 3. BARRA LATERAL (SIDEBAR) CORPORATIVA
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/2592/2592317.png", width=80) # Icono de seguridad
+    st.title("Estado del Sistema")
+    st.divider()
+    total_en_memoria = len(st.session_state['database'])
+    st.metric(label="Registros Tokenizados en Bóveda", value=total_en_memoria)
+    st.caption("🔒 Seguridad SHA-256 + Salting activo.")
+    st.divider()
+    st.info("💡 **Tip para la demo:** Cambia entre las pestañas a la derecha para operar el Sandbox.")
 
-# --- SECCIÓN DE ESTADÍSTICAS ---
-total_en_memoria = len(st.session_state['database'])
-st.info(f"💾 **Base de Datos Segura:** Actualmente hay **{total_en_memoria}** datos guardados en el Sandbox.")
+# 4. ENCABEZADO PRINCIPAL
+st.markdown('<p class="main-header">🛡️ Motor de Riesgo y Privacidad (Sandbox)</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Plataforma académica para tokenización de datos confidenciales y prevención de fraude.</p>', unsafe_allow_html=True)
 
-if total_en_memoria > 0:
-    with st.expander("📊 Ver distribución de riesgos (Gráfico)"):
-        # Contar cuántos datos hay de cada categoría
-        conteo_riesgos = {}
-        for info in st.session_state['database'].values():
-            estado = info["status"]
-            conteo_riesgos[estado] = conteo_riesgos.get(estado, 0) + 1
-        
-        # Generar gráfico de barras
-        df_chart = pd.DataFrame(list(conteo_riesgos.items()), columns=["Categoría", "Cantidad"])
-        st.bar_chart(df_chart.set_index("Categoría"))
+# 5. SISTEMA DE PESTAÑAS (TABS)
+tab_carga, tab_consulta, tab_dashboard = st.tabs([
+    "📤 Carga y Tokenización de Datos", 
+    "🔍 Motor de Consultas (Scoring)", 
+    "📊 Dashboard Estadístico"
+])
 
-st.divider()
-
-# SECCIÓN A: SUBIR DATOS
-st.header("1. Subir Base de Datos (Excel)")
-st.markdown("Sube un archivo `.xlsx`. Puede contener solo `email`, solo `telefono`, solo `dni`, o las tres columnas juntas.")
-archivo_subido = st.file_uploader("Sube tu archivo .xlsx", type=["xlsx"])
-
-# --- MENÚ DESPLEGABLE DE RIESGO ---
-opciones_riesgo = {
-    "OK (Buen Dato)": {"status": "OK 🟢", "score": 0},
-    "Posible Fraude (No confirmado)": {"status": "Posible Fraude 🟡", "score": 50},
-    "Fraude: Cuenta Mula": {"status": "Cuenta Mula 🟠", "score": 75},
-    "Fraude: Onboarding": {"status": "Fraude Onboarding 🟠", "score": 75},
-    "Fraude: Transaccional": {"status": "Fraude Transaccional 🔴", "score": 99}
-}
-
-categoria_seleccionada = st.selectbox(
-    "Selecciona la categoría de riesgo para los datos de este archivo:", 
-    list(opciones_riesgo.keys())
-)
-
-if archivo_subido is not None:
-    if st.button("Procesar y Guardar"):
-        df = pd.read_excel(archivo_subido)
-        columnas_esperadas = ["email", "telefono", "dni"]
-        columnas_encontradas = [col for col in columnas_esperadas if col in df.columns]
-        
-        if not columnas_encontradas:
-            st.error("❌ El archivo no contiene columnas válidas ('email', 'telefono' o 'dni').")
-        else:
-            registros_nuevos = 0
-            riesgo_asignado = opciones_riesgo[categoria_seleccionada]
-            
-            for col in columnas_encontradas:
-                for dato in df[col]:
-                    token = tokenizar_dato(dato)
-                    if token:
-                        st.session_state['database'][token] = riesgo_asignado
-                        registros_nuevos += 1
-            
-            guardar_memoria(st.session_state['database'])
-                        
-            st.success(f"✔️ Columnas procesadas con éxito: **{', '.join(columnas_encontradas)}**")
-            st.success(f"🚀 Se guardaron {registros_nuevos} registros clasificados como '{categoria_seleccionada}'.")
-            st.button("Actualizar Vista 🔄")
-
-st.divider()
-
-# SECCIÓN B: CONSULTAR DATOS
-st.header("2. Consultar Nivel de Riesgo")
-st.markdown("Ingresa un dato real. El sistema le añadirá la 'Sal' criptográfica invisible, lo tokenizará de forma segura y buscará su score en la bóveda.")
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    email_input = st.text_input("Email")
-with col2:
-    telefono_input = st.text_input("Teléfono")
-with col3:
-    dni_input = st.text_input("DNI")
-
-if st.button("🔍 Consultar Score"):
-    token_buscado = None
-    if email_input: token_buscado = tokenizar_dato(email_input)
-    elif telefono_input: token_buscado = tokenizar_dato(telefono_input)
-    elif dni_input: token_buscado = tokenizar_dato(dni_input)
+# --- PESTAÑA 1: CARGA DE DATOS ---
+with tab_carga:
+    col_izq, col_der = st.columns([1, 1])
     
-    if not token_buscado:
-        st.warning("Por favor, ingresa al menos un dato para consultar.")
-    else:
-        st.session_state['database'] = cargar_memoria()
-        resultado = st.session_state['database'].get(token_buscado)
+    with col_izq:
+        st.subheader("1. Configurar Parámetros de Riesgo")
+        st.markdown("Clasifica los datos antes de inyectarlos al sistema.")
+        opciones_riesgo = {
+            "OK (Buen Dato)": {"status": "OK", "score": 0, "color": "🟢"},
+            "Posible Fraude (No confirmado)": {"status": "Posible Fraude", "score": 50, "color": "🟡"},
+            "Fraude: Cuenta Mula": {"status": "Cuenta Mula", "score": 75, "color": "🟠"},
+            "Fraude: Onboarding": {"status": "Fraude Onboarding", "score": 75, "color": "🟠"},
+            "Fraude: Transaccional": {"status": "Fraude Transaccional", "score": 99, "color": "🔴"}
+        }
+        categoria_seleccionada = st.selectbox("Categoría de riesgo para este lote:", list(opciones_riesgo.keys()))
+    
+    with col_der:
+        st.subheader("2. Subir Base de Datos")
+        archivo_subido = st.file_uploader("Sube tu archivo .xlsx (email, telefono, dni)", type=["xlsx"])
+    
+    if archivo_subido is not None:
+        if st.button("Procesar, Tokenizar y Guardar 🚀", use_container_width=True):
+            with st.spinner('Procesando datos y aplicando criptografía...'):
+                df = pd.read_excel(archivo_subido)
+                columnas_encontradas = [col for col in ["email", "telefono", "dni"] if col in df.columns]
+                
+                if not columnas_encontradas:
+                    st.error("❌ El archivo no contiene columnas válidas.")
+                else:
+                    registros_nuevos = 0
+                    riesgo_asignado = opciones_riesgo[categoria_seleccionada]
+                    
+                    for col in columnas_encontradas:
+                        for dato in df[col]:
+                            token = tokenizar_dato(dato)
+                            if token:
+                                st.session_state['database'][token] = riesgo_asignado
+                                registros_nuevos += 1
+                    
+                    guardar_memoria(st.session_state['database'])
+                    st.success(f"✅ ¡Operación exitosa! {registros_nuevos} datos procesados de las columnas: {', '.join(columnas_encontradas)}")
+                    st.info("👉 Ve a la pestaña 'Dashboard Estadístico' o 'Motor de Consultas' para ver los resultados.")
+
+# --- PESTAÑA 2: MOTOR DE CONSULTAS ---
+with tab_consulta:
+    st.subheader("Consultar Nivel de Riesgo (Scoring)")
+    st.markdown("Ingresa un dato real. El motor generará el Hash seguro en tiempo real para buscar su score.")
+    
+    col_c1, col_c2, col_c3 = st.columns(3)
+    with col_c1:
+        email_input = st.text_input("Consultar Email")
+    with col_c2:
+        telefono_input = st.text_input("Consultar Teléfono")
+    with col_c3:
+        dni_input = st.text_input("Consultar DNI")
         
-        st.subheader("Resultados del Motor de Riesgo:")
-        st.info(f"**Token generado (SHA-256 + Salting):** `{token_buscado}`")
+    if st.button("🔍 Ejecutar Consulta Segura", use_container_width=True):
+        token_buscado = None
+        if email_input: token_buscado = tokenizar_dato(email_input)
+        elif telefono_input: token_buscado = tokenizar_dato(telefono_input)
+        elif dni_input: token_buscado = tokenizar_dato(dni_input)
         
-        if resultado:
-            col_res1, col_res2 = st.columns(2)
-            col_res1.metric(label="Estado", value=resultado["status"])
-            col_res2.metric(label="Score de Riesgo", value=f"{resultado['score']} / 100")
+        if not token_buscado:
+            st.warning("⚠️ Debes ingresar al menos un dato para ejecutar la consulta.")
         else:
-            st.error("El dato consultado no se encuentra en la base de datos.")
+            st.session_state['database'] = cargar_memoria()
+            resultado = st.session_state['database'].get(token_buscado)
+            
+            st.markdown("### 📄 Reporte de Inteligencia")
+            st.code(f"HASH IDENTIFICADOR (SHA-256):\n{token_buscado}", language="markdown")
+            
+            if resultado:
+                # Mostrar en tarjetas grandes (métricas)
+                r_col1, r_col2 = st.columns(2)
+                r_col1.metric(label="Clasificación de Estado", value=f"{resultado['status']} {resultado['color']}")
+                r_col2.metric(label="Score de Riesgo (0-100)", value=resultado['score'])
+                
+                # Barra de progreso visual según el riesgo
+                st.progress(resultado['score'] / 100)
+            else:
+                st.error("❌ Dato limpio. No existen registros de riesgo en la bóveda para esta identidad.")
+
+# --- PESTAÑA 3: DASHBOARD ESTADÍSTICO ---
+with tab_dashboard:
+    st.subheader("Análisis Global de Riesgo")
+    
+    if len(st.session_state['database']) == 0:
+        st.info("El Sandbox está vacío. Ve a la pestaña 'Carga de Datos' para inyectar información.")
+    else:
+        # Preparar datos para el gráfico
+        conteo = {}
+        for info in st.session_state['database'].values():
+            nombre = f"{info['status']} {info['color']}"
+            conteo[nombre] = conteo.get(nombre, 0) + 1
+            
+        df_chart = pd.DataFrame(list(conteo.items()), columns=["Categoría", "Cantidad"])
+        
+        col_g1, col_g2 = st.columns([2, 1])
+        
+        with col_g1:
+            # Gráfico de anillo con Plotly
+            fig = px.pie(df_chart, values='Cantidad', names='Categoría', hole=0.5, 
+                         title="Distribución de Entidades por Riesgo")
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            st.plotly_chart(fig, use_container_width=True)
+            
+        with col_g2:
+            st.markdown("### Resumen")
+            st.dataframe(df_chart, use_container_width=True, hide_index=True)
