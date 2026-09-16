@@ -5,7 +5,11 @@ import json
 import os
 
 # --- CONFIGURACIÓN DE MEMORIA FÍSICA ---
-ARCHIVO_MEMORIA = "memoria_sandbox.json"
+ARCHIVO_MEMORIA = "memoria_sandbox_segura.json" # Cambiamos el nombre para empezar con la nueva seguridad
+
+# --- NUEVO: LA "SAL" CRIPTOGRÁFICA (SALTING) ---
+# Esta es la palabra secreta. En un banco real esto se guarda bajo llave, no en el código.
+SAL_SECRETA = "Tr#9q!Lp$2*mZ&8vX@1y_Sandbox_Riesgo_2026_UltraSecreto"
 
 def cargar_memoria():
     """Lee los datos guardados en el archivo físico."""
@@ -26,18 +30,23 @@ st.set_page_config(page_title="Sandbox de Riesgo", page_icon="🛡️", layout="
 if 'database' not in st.session_state:
     st.session_state['database'] = cargar_memoria()
 
-# 3. FUNCIÓN PARA TOKENIZAR (Cifrado SHA-256)
+# 3. FUNCIÓN PARA TOKENIZAR (Ahora con SALTING)
 def tokenizar_dato(valor):
     if pd.isna(valor) or valor == "": 
         return ""
     valor_limpio = str(valor).strip().lower()
-    return hashlib.sha256(valor_limpio.encode()).hexdigest()
+    
+    # Aquí ocurre la magia: unimos el dato real con nuestra SAL secreta
+    dato_salado = valor_limpio + SAL_SECRETA
+    
+    # Aplicamos el SHA-256 al dato ya mezclado
+    return hashlib.sha256(dato_salado.encode()).hexdigest()
 
 # 4. INTERFAZ GRÁFICA
 st.title("🛡️ Sandbox: Privacidad y Score de Riesgo")
-st.markdown("Prototipo académico para prevención de fraude y tokenización de datos confidenciales.")
+st.markdown("Prototipo académico con **Salting Criptográfico (SHA-256)** para prevención de fraude y tokenización de datos confidenciales.")
 
-# --- SECCIÓN DE ESTADÍSTICAS (¡NUEVO!) ---
+# --- SECCIÓN DE ESTADÍSTICAS ---
 total_en_memoria = len(st.session_state['database'])
 st.info(f"💾 **Base de Datos Segura:** Actualmente hay **{total_en_memoria}** datos guardados en el Sandbox.")
 
@@ -103,7 +112,7 @@ st.divider()
 
 # SECCIÓN B: CONSULTAR DATOS
 st.header("2. Consultar Nivel de Riesgo")
-st.markdown("Ingresa un dato real. El sistema lo tokeniza de forma segura y busca su score en la bóveda.")
+st.markdown("Ingresa un dato real. El sistema le añadirá la 'Sal' criptográfica invisible, lo tokenizará de forma segura y buscará su score en la bóveda.")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -122,12 +131,11 @@ if st.button("🔍 Consultar Score"):
     if not token_buscado:
         st.warning("Por favor, ingresa al menos un dato para consultar.")
     else:
-        # Aseguramos tener los datos más recientes
         st.session_state['database'] = cargar_memoria()
         resultado = st.session_state['database'].get(token_buscado)
         
         st.subheader("Resultados del Motor de Riesgo:")
-        st.info(f"**Token generado (SHA-256):** `{token_buscado}`")
+        st.info(f"**Token generado (SHA-256 + Salting):** `{token_buscado}`")
         
         if resultado:
             col_res1, col_res2 = st.columns(2)
