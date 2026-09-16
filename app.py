@@ -6,7 +6,8 @@ import os
 import plotly.express as px
 
 # --- CONFIGURACIÓN DE MEMORIA FÍSICA ---
-ARCHIVO_MEMORIA = "memoria_sandbox_segura.json"
+# Cambiamos el nombre para empezar con una bóveda 100% limpia y compatible
+ARCHIVO_MEMORIA = "memoria_sandbox_v3.json" 
 SAL_SECRETA = "Tr#9q!Lp$2*mZ&8vX@1y_Sandbox_Riesgo_2026_UltraSecreto"
 
 def cargar_memoria():
@@ -19,7 +20,7 @@ def guardar_memoria(datos):
     with open(ARCHIVO_MEMORIA, "w") as f:
         json.dump(datos, f)
 
-# 1. CONFIGURACIÓN DE LA PÁGINA (Ahora usamos layout="wide" para usar toda la pantalla)
+# 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Motor de Riesgo Anti-Fraude", page_icon="🛡️", layout="wide")
 
 # --- ESTILOS CSS PERSONALIZADOS ---
@@ -44,7 +45,7 @@ def tokenizar_dato(valor):
 
 # 3. BARRA LATERAL (SIDEBAR) CORPORATIVA
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2592/2592317.png", width=80) # Icono de seguridad
+    st.image("https://cdn-icons-png.flaticon.com/512/2592/2592317.png", width=80)
     st.title("Estado del Sistema")
     st.divider()
     total_en_memoria = len(st.session_state['database'])
@@ -136,12 +137,12 @@ with tab_consulta:
             st.code(f"HASH IDENTIFICADOR (SHA-256):\n{token_buscado}", language="markdown")
             
             if resultado:
-                # Mostrar en tarjetas grandes (métricas)
                 r_col1, r_col2 = st.columns(2)
-                r_col1.metric(label="Clasificación de Estado", value=f"{resultado['status']} {resultado['color']}")
+                # Usamos .get('color', '') por si acaso falta para que no rompa
+                color_icono = resultado.get('color', '') 
+                r_col1.metric(label="Clasificación de Estado", value=f"{resultado['status']} {color_icono}")
                 r_col2.metric(label="Score de Riesgo (0-100)", value=resultado['score'])
                 
-                # Barra de progreso visual según el riesgo
                 st.progress(resultado['score'] / 100)
             else:
                 st.error("❌ Dato limpio. No existen registros de riesgo en la bóveda para esta identidad.")
@@ -153,10 +154,10 @@ with tab_dashboard:
     if len(st.session_state['database']) == 0:
         st.info("El Sandbox está vacío. Ve a la pestaña 'Carga de Datos' para inyectar información.")
     else:
-        # Preparar datos para el gráfico
         conteo = {}
         for info in st.session_state['database'].values():
-            nombre = f"{info['status']} {info['color']}"
+            # Usamos .get() de forma segura
+            nombre = f"{info['status']} {info.get('color', '')}"
             conteo[nombre] = conteo.get(nombre, 0) + 1
             
         df_chart = pd.DataFrame(list(conteo.items()), columns=["Categoría", "Cantidad"])
@@ -164,7 +165,6 @@ with tab_dashboard:
         col_g1, col_g2 = st.columns([2, 1])
         
         with col_g1:
-            # Gráfico de anillo con Plotly
             fig = px.pie(df_chart, values='Cantidad', names='Categoría', hole=0.5, 
                          title="Distribución de Entidades por Riesgo")
             fig.update_traces(textposition='inside', textinfo='percent+label')
