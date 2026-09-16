@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 
-# --- NUEVO: CONFIGURACIÓN DE MEMORIA FÍSICA ---
+# --- CONFIGURACIÓN DE MEMORIA FÍSICA ---
 ARCHIVO_MEMORIA = "memoria_sandbox.json"
 
 def cargar_memoria():
@@ -22,7 +22,7 @@ def guardar_memoria(datos):
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Sandbox de Riesgo", page_icon="🛡️", layout="centered")
 
-# 2. BASE DE DATOS (Carga desde el archivo JSON al iniciar)
+# 2. CARGA DE BASE DE DATOS
 if 'database' not in st.session_state:
     st.session_state['database'] = cargar_memoria()
 
@@ -35,17 +35,44 @@ def tokenizar_dato(valor):
 
 # 4. INTERFAZ GRÁFICA
 st.title("🛡️ Sandbox: Privacidad y Score de Riesgo")
-st.markdown("Prototipo académico con memoria persistente para tokenización de datos.")
+st.markdown("Prototipo académico para prevención de fraude y tokenización de datos confidenciales.")
 
+# --- SECCIÓN DE ESTADÍSTICAS (¡NUEVO!) ---
 total_en_memoria = len(st.session_state['database'])
-st.info(f"💾 **Base de Datos Segura:** Actualmente hay **{total_en_memoria}** datos tokenizados guardados.")
+st.info(f"💾 **Base de Datos Segura:** Actualmente hay **{total_en_memoria}** datos guardados en el Sandbox.")
+
+if total_en_memoria > 0:
+    with st.expander("📊 Ver distribución de riesgos (Gráfico)"):
+        # Contar cuántos datos hay de cada categoría
+        conteo_riesgos = {}
+        for info in st.session_state['database'].values():
+            estado = info["status"]
+            conteo_riesgos[estado] = conteo_riesgos.get(estado, 0) + 1
+        
+        # Generar gráfico de barras
+        df_chart = pd.DataFrame(list(conteo_riesgos.items()), columns=["Categoría", "Cantidad"])
+        st.bar_chart(df_chart.set_index("Categoría"))
 
 st.divider()
 
 # SECCIÓN A: SUBIR DATOS
 st.header("1. Subir Base de Datos (Excel)")
+st.markdown("Sube un archivo `.xlsx`. Puede contener solo `email`, solo `telefono`, solo `dni`, o las tres columnas juntas.")
 archivo_subido = st.file_uploader("Sube tu archivo .xlsx", type=["xlsx"])
-es_lista_negra = st.toggle("🚨 Marcar como Lista Negra (Alto Riesgo)")
+
+# --- MENÚ DESPLEGABLE DE RIESGO ---
+opciones_riesgo = {
+    "OK (Buen Dato)": {"status": "OK 🟢", "score": 0},
+    "Posible Fraude (No confirmado)": {"status": "Posible Fraude 🟡", "score": 50},
+    "Fraude: Cuenta Mula": {"status": "Cuenta Mula 🟠", "score": 75},
+    "Fraude: Onboarding": {"status": "Fraude Onboarding 🟠", "score": 75},
+    "Fraude: Transaccional": {"status": "Fraude Transaccional 🔴", "score": 99}
+}
+
+categoria_seleccionada = st.selectbox(
+    "Selecciona la categoría de riesgo para los datos de este archivo:", 
+    list(opciones_riesgo.keys())
+)
 
 if archivo_subido is not None:
     if st.button("Procesar y Guardar"):
@@ -57,25 +84,26 @@ if archivo_subido is not None:
             st.error("❌ El archivo no contiene columnas válidas ('email', 'telefono' o 'dni').")
         else:
             registros_nuevos = 0
+            riesgo_asignado = opciones_riesgo[categoria_seleccionada]
+            
             for col in columnas_encontradas:
                 for dato in df[col]:
                     token = tokenizar_dato(dato)
                     if token:
-                        riesgo = {"status": "Alto Riesgo (Lista Negra) 🔴", "score": 99} if es_lista_negra else {"status": "OK 🟢", "score": 0}
-                        st.session_state['database'][token] = riesgo
+                        st.session_state['database'][token] = riesgo_asignado
                         registros_nuevos += 1
             
-            # --- NUEVO: GUARDAR EN EL ARCHIVO FÍSICO ---
             guardar_memoria(st.session_state['database'])
                         
-            st.success(f"✔️ Columnas procesadas: **{', '.join(columnas_encontradas)}**")
-            st.success(f"🚀 ¡Éxito! Se guardaron {registros_nuevos} registros permanentemente.")
+            st.success(f"✔️ Columnas procesadas con éxito: **{', '.join(columnas_encontradas)}**")
+            st.success(f"🚀 Se guardaron {registros_nuevos} registros clasificados como '{categoria_seleccionada}'.")
             st.button("Actualizar Vista 🔄")
 
 st.divider()
 
 # SECCIÓN B: CONSULTAR DATOS
 st.header("2. Consultar Nivel de Riesgo")
+st.markdown("Ingresa un dato real. El sistema lo tokeniza de forma segura y busca su score en la bóveda.")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -92,18 +120,18 @@ if st.button("🔍 Consultar Score"):
     elif dni_input: token_buscado = tokenizar_dato(dni_input)
     
     if not token_buscado:
-        st.warning("Ingresa un dato para consultar.")
+        st.warning("Por favor, ingresa al menos un dato para consultar.")
     else:
-        # Volvemos a cargar por si hubo cambios
+        # Aseguramos tener los datos más recientes
         st.session_state['database'] = cargar_memoria()
         resultado = st.session_state['database'].get(token_buscado)
         
         st.subheader("Resultados del Motor de Riesgo:")
-        st.info(f"**Token generado:** `{token_buscado}`")
+        st.info(f"**Token generado (SHA-256):** `{token_buscado}`")
         
         if resultado:
             col_res1, col_res2 = st.columns(2)
             col_res1.metric(label="Estado", value=resultado["status"])
-            col_res2.metric(label="Score", value=f"{resultado['score']} / 100")
+            col_res2.metric(label="Score de Riesgo", value=f"{resultado['score']} / 100")
         else:
-            st.error("El dato no se encuentra en la base de datos.")
+            st.error("El dato consultado no se encuentra en la base de datos.")
