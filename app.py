@@ -6,7 +6,6 @@ import os
 import plotly.express as px
 
 # --- CONFIGURACIÓN DE MEMORIA FÍSICA ---
-# Cambiamos el nombre para empezar con una bóveda 100% limpia y compatible
 ARCHIVO_MEMORIA = "memoria_sandbox_v3.json" 
 SAL_SECRETA = "Tr#9q!Lp$2*mZ&8vX@1y_Sandbox_Riesgo_2026_UltraSecreto"
 
@@ -21,13 +20,14 @@ def guardar_memoria(datos):
         json.dump(datos, f)
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
-st.set_page_config(page_title="Motor de Riesgo Anti-Fraude", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="Sandbox Federado AL", page_icon="🛡️", layout="wide")
 
 # --- ESTILOS CSS PERSONALIZADOS ---
 st.markdown("""
     <style>
         .main-header { font-size: 2.5rem; color: #1E3A8A; font-weight: 700; margin-bottom: 0px;}
         .sub-header { font-size: 1.2rem; color: #64748B; margin-bottom: 2rem;}
+        .sidebar-brand { font-size: 1.8rem; font-weight: 800; color: #0F172A; margin-top: 15px; line-height: 1.1;}
         .stTabs [data-baseweb="tab-list"] { gap: 24px; }
         .stTabs [data-baseweb="tab"] { font-size: 1.1rem; font-weight: 600; }
     </style>
@@ -46,16 +46,18 @@ def tokenizar_dato(valor):
 # 3. BARRA LATERAL (SIDEBAR) CORPORATIVA
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2592/2592317.png", width=80)
-    st.title("Estado del Sistema")
+    # Aquí agregamos el nuevo nombre bien grande
+    st.markdown('<p class="sidebar-brand">Sandbox Federado AL</p>', unsafe_allow_html=True)
     st.divider()
+    
+    st.title("Estado del Sistema")
     total_en_memoria = len(st.session_state['database'])
     st.metric(label="Registros Tokenizados en Bóveda", value=total_en_memoria)
     st.caption("🔒 Seguridad SHA-256 + Salting activo.")
-    st.divider()
-    st.info("💡 **Tip para la demo:** Cambia entre las pestañas a la derecha para operar el Sandbox.")
+    # El cuadro de "Tip para la demo" fue eliminado de aquí
 
 # 4. ENCABEZADO PRINCIPAL
-st.markdown('<p class="main-header">🛡️ Motor de Riesgo y Privacidad (Sandbox)</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">🛡️ Sandbox Federado AL</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Plataforma académica para tokenización de datos confidenciales y prevención de fraude.</p>', unsafe_allow_html=True)
 
 # 5. SISTEMA DE PESTAÑAS (TABS)
@@ -138,7 +140,6 @@ with tab_consulta:
             
             if resultado:
                 r_col1, r_col2 = st.columns(2)
-                # Usamos .get('color', '') por si acaso falta para que no rompa
                 color_icono = resultado.get('color', '') 
                 r_col1.metric(label="Clasificación de Estado", value=f"{resultado['status']} {color_icono}")
                 r_col2.metric(label="Score de Riesgo (0-100)", value=resultado['score'])
@@ -156,7 +157,6 @@ with tab_dashboard:
     else:
         conteo = {}
         for info in st.session_state['database'].values():
-            # Usamos .get() de forma segura
             nombre = f"{info['status']} {info.get('color', '')}"
             conteo[nombre] = conteo.get(nombre, 0) + 1
             
